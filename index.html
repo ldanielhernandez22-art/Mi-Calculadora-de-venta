@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punto de Venta Seguro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f5; padding-bottom: 80px; }
+        
+        /* --- BARRA SUPERIOR --- */
+        .app-bar {
+            background-color: #007bff; color: white; padding: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 1000;
+        }
+        .app-title { margin: 0; font-size: 1.2rem; }
+        .menu-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0 10px; }
+        
+        /* MENU DESPLEGABLE */
+        .dropdown-menu {
+            display: none; position: absolute; top: 100%; right: 10px;
+            background-color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border-radius: 8px; overflow: hidden; z-index: 101; width: 200px;
+        }
+        .dropdown-menu.show { display: block; }
+        .dropdown-item {
+            display: block; padding: 15px 20px; color: #333; text-decoration: none;
+            cursor: pointer; border-bottom: 1px solid #f0f0f0;
+        }
+        .dropdown-item:hover { background-color: #f8f9fa; }
+
+        /* --- CONTENEDOR --- */
+        .main-container { max-width: 600px; margin: 20px auto; padding: 0 10px; }
+
+        /* --- TARJETAS --- */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .card-header { border-bottom: 1px solid #eee; margin-bottom: 15px; padding-bottom: 10px; font-weight: bold; color: #555; display: flex; justify-content: space-between; align-items: center; }
+        
+        label { font-size: 0.85rem; color: #666; font-weight: bold; display: block; margin-top: 10px; }
+        input { width: 100%; padding: 12px; margin: 5px 0 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        
+        /* BOTONES */
+        button.action-btn { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; font-weight: bold; }
+        .btn-green { background-color: #28a745; color: white; }
+        .btn-blue { background-color: #007bff; color: white; }
+        .btn-red { background-color: #dc3545; color: white; width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0;}
+        .btn-yellow { background-color: #ffc107; color: #333; font-size: 0.9rem; padding: 8px; width: auto; margin-top: 5px; }
+        .btn-outline { background-color: transparent; border: 2px solid #6c757d; color: #6c757d; margin-bottom: 10px; }
+
+        .input-group { display: flex; gap: 10px; }
+        .input-group div { flex: 1; }
+
+        /* RESULTADOS */
+        #area-calculo { display: none; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #eee; }
+        .info-producto { background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
+        .fila-resultado { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .total-grande { font-size: 1.6em; font-weight: bold; color: #28a745; }
+        .ganancia-grande { font-size: 1.1em; font-weight: bold; color: #007bff; }
+        .error { color: #dc3545; font-weight: bold; margin-top: 10px; text-align: center; }
+        .hidden-view { display: none; }
+
+        /* TABLA LISTA */
+        .tabla-lista { width: 100%; border-collapse: collapse; }
+        .tabla-lista th { text-align: left; color: #666; font-size: 0.8rem; border-bottom: 2px solid #eee; padding-bottom: 5px;}
+        .tabla-lista td { padding: 10px 0; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        
+        .col-nombre { width: 45%; }
+        .nombre-prod { font-weight: bold; color: #333; display: block; cursor: pointer;}
+        .precio-prod { font-size: 0.85rem; color: #777; }
+        
+        .col-cant { width: 25%; text-align: center;}
+        .input-cant-lista { width: 60px; text-align: center; padding: 8px; border: 1px solid #ccc; font-weight: bold; color: #007bff; }
+        
+        .col-subtotal { width: 30%; text-align: right; font-weight: bold; color: #333; }
+
+        /* BARRA INFERIOR */
+        .barra-totales-fija {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; border-top: 1px solid #ccc; padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: none; justify-content: space-between; align-items: center;
+            z-index: 900;
+        }
+        .barra-col { display: flex; flex-direction: column; }
+        .lbl-tot { font-size: 0.8rem; color: #666; }
+        .val-tot { font-size: 1.4rem; font-weight: bold; color: #28a745; }
+        .val-gan { font-size: 1rem; font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+
+    <div class="app-bar">
+        <h1 class="app-title" id="tituloApp">Calculadora</h1>
+        <button class="menu-btn" onclick="toggleMenu()">⋮</button>
+        
+        <div id="dropdownMenu" class="dropdown-menu">
+            <div class="dropdown-item" onclick="irABusqueda()">🔍 Calculadora Simple</div>
+            <div class="dropdown-item" onclick="irAListaCompleta()">📋 Ver Lista Completa</div>
+            <div class="dropdown-item" onclick="irAAdministrar(true)">➕ Agregar Producto</div>
+            <div class="dropdown-item" onclick="resetearFabrica()">⚠️ Borrar Todo (Reset)</div>
+        </div>
+    </div>
+
+
+    <div class="main-container">
+
+        <div id="vista-admin" class="card hidden-view" style="border-top: 4px solid #28a745;">
+             <button class="action-btn btn-outline" onclick="volverAtras()">← Volver</button>
+            <div class="card-header">💾 Guardar Producto</div>
+            
+            <label>Nombre del Producto:</label>
+            <input type="text" id="nombreProducto" placeholder="Ej: Coca Cola 3L">
+            
+            <div class="input-group">
+                <div>
+                    <label>Precio Venta ($):</label>
+                    <input type="number" id="precioProducto" placeholder="0.00">
+                </div>
+                <div>
+                    <label>Costo ($):</label>
+                    <input type="number" id="costoProducto" placeholder="0.00">
+                </div>
+            </div>
+            <button class="action-btn btn-green" onclick="guardarProducto()">Guardar / Actualizar</button>
+        </div>
+
+
+        <div id="vista-busqueda" class="card" style="border-top: 4px solid #007bff;">
+            <div class="card-header">🧮 Buscador Rápido</div>
+            
+            <input type="text" id="busqueda" placeholder="🔍 Escribe nombre..." onkeypress="handleEnter(event)">
+            <button class="action-btn btn-blue" onclick="buscarProducto()">Buscar</button>
+            <div id="mensajeError" class="error"></div>
+
+            <div id="area-calculo">
+                <div class="info-producto">
+                    <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 5px;">
+                        <span id="displayNombre">---</span>
+                    </div>
+                     <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>Precio: $<span id="displayPrecio">0.00</span> <small>(Costo: $<span id="displayCosto">0.00</span>)</small></div>
+                        <button class="action-btn btn-yellow" onclick="cargarDatosParaEditar()">✏️ Editar</button>
+                    </div>
+                </div>
+
+                <label>Cantidad:</label>
+                <input type="number" id="cantidad" style="font-size: 1.2rem; font-weight: bold;" placeholder="1" oninput="calcularTotal()">
+                <hr>
+                <div class="fila-resultado">
+                    <span>Total:</span>
+                    <span class="total-grande">$<span id="resultadoTotal">0.00</span></span>
+                </div>
+                <div class="fila-resultado">
+                    <span>Ganancia:</span>
+                    <span class="ganancia-grande">$<span id="resultadoGanancia">0.00</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div id="vista-lista" class="hidden-view">
+            <div class="card">
+                <div class="card-header">
+                    <span>📝 Lista Completa</span>
+                    <button class="btn-red" onclick="limpiarCantidades()">🗑️ Limpiar</button>
+                </div>
+                
+                <table class="tabla-lista">
+                    <thead>
+                        <tr>
+                            <th class="col-nombre">Producto</th>
+                            <th class="col-cant">Cant.</th>
+                            <th class="col-subtotal">Sub.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTablaLista"></tbody>
+                </table>
+                <div style="height: 60px;"></div>
+            </div>
+
+            <div class="barra-totales-fija">
+                <div class="barra-col">
+                    <span class="lbl-tot">Total:</span>
+                    <span class="val-tot">$<span id="totalLista">0.00</span></span>
+                </div>
+                <div class="barra-col" style="text-align: right;">
+                    <span class="lbl-tot">Ganancia:</span>
+                    <span class="val-gan">$<span id="gananciaLista">0.00</span></span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- BASE DE DATOS SEGURA ---
+        let baseDeDatos = {};
+        
+        try {
+            const datosGuardados = localStorage.getItem('misProductos');
+            if (datosGuardados) {
+                baseDeDatos = JSON.parse(datosGuardados);
+            }
+        } catch (e) {
+            console.error("Error cargando datos", e);
+            alert("Hubo un error cargando tus productos antiguos. Se iniciará una base vacía.");
+            baseDeDatos = {};
+        }
+
+        let precioActual = 0, costoActual = 0, nombreActual = "";
+        let vistaAnterior = 'search';
+
+        // --- MENU ---
+        function toggleMenu() {
+            document.getElementById('dropdownMenu').classList.toggle('show');
+        }
+        window.onclick = function(event) {
+            if (!event.target.matches('.menu-btn')) {
+                var dropdowns = document.getElementsByClassName("dropdown-menu");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].classList.remove('show');
+                }
+            }
+        }
+
+        // --- NAVEGACION ---
+        function ocultarTodasLasVistas() {
+            document.getElementById('vista-admin').classList.add('hidden-view');
+            document.getElementById('vista-busqueda').classList.add('hidden-view');
+            document.getElementById('vista-lista').classList.add('hidden-view');
+            document.querySelector('.barra-totales-fija').style.display = 'none';
+        }
+
+        function irABusqueda() {
+            ocultarTodasLasVistas();
+            document.getElementById('vista-busqueda').classList.remove('hidden-view');
+            document.getElementById('tituloApp').innerText = "Calculadora";
+            vistaAnterior = 'search';
+        }
+
+        function irAAdministrar(limpiar) {
+            ocultarTodasLasVistas();
+            if(limpiar) {
+                document.getElementById('nombreProducto').value = "";
+                document.getElementById('precioProducto').value = "";
+                document.getElementById('costoProducto').value = "";
+            }
+            document.getElementById('vista-admin').classList.remove('hidden-view');
+            document.getElementById('tituloApp').innerText = "Administrar";
+        }
+
+        function volverAtras() {
+            if(vistaAnterior === 'lista') irAListaCompleta();
+            else irABusqueda();
+        }
+
+        // --- LOGICA LISTA (Corregida) ---
+        function irAListaCompleta() {
+            ocultarTodasLasVistas();
+            document.getElementById('vista-lista').classList.remove('hidden-view');
+            document.querySelector('.barra-totales-fija').style.display = 'flex';
+            document.getElementById('tituloApp').innerText = "Lista Completa";
+            vistaAnterior = 'lista';
+            renderizarTablaLista();
+        }
+
+        function renderizarTablaLista() {
+            const tbody = document.getElementById('cuerpoTablaLista');
+            tbody.innerHTML = "";
+            
+            const productosOrdenados = Object.keys(baseDeDatos).sort();
+
+            if (productosOrdenados.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='3' style='text-align:center; padding: 20px;'>No hay productos.</td></tr>";
+                return;
+            }
+
+            // Usamos un contador para generar IDs únicos simples (id-0, id-1, etc)
+            // Esto evita el error de comillas en los nombres
+            productosOrdenados.forEach((nombre, index) => {
+                let prod = baseDeDatos[nombre];
+                if (typeof prod === 'number') prod = { precio: prod, costo: 0 };
+
+                const fila = document.createElement('tr');
+                const uniqueID = index; 
+
+                // Creamos los elementos de forma segura
+                fila.innerHTML = `
+                    <td>
+                        <span class="nombre-prod" data-nombre="${nombre}" onclick="clickEnNombre(this)">${nombre.toUpperCase()}</span>
+                        <span class="precio-prod">$${prod.precio.toFixed(2)}</span>
+                    </td>
+                    <td class="col-cant">
+                        <input type="number" inputmode="numeric" class="input-cant-lista" 
+                               id="inp-${uniqueID}" 
+                               data-precio="${prod.precio}" 
+                               data-costo="${prod.costo}" 
+                               oninput="actualizarFila(${uniqueID})" 
+                               placeholder="-">
+                    </td>
+                    <td class="col-subtotal">
+                        $<span id="sub-${uniqueID}">0.00</span>
+                    </td>
+                `;
+                tbody.appendChild(fila);
+            });
+        }
+
+        function clickEnNombre(elemento) {
+            const nombre = elemento.getAttribute('data-nombre');
+            if(confirm('¿Editar "' + nombre + '"?')){
+                 buscarProductoInterno(nombre);
+                 cargarDatosParaEditar();
+            }
+        }
+
+        function actualizarFila(id) {
+            // 1. Calcular subtotal de la fila
+            const input = document.getElementById('inp-' + id);
+            const spanSub = document.getElementById('sub-' + id);
+            
+            const cantidad = parseFloat(input.value) || 0;
+            const precio = parseFloat(input.getAttribute('data-precio'));
+            
+            spanSub.innerText = (cantidad * precio).toFixed(2);
+
+            // 2. Recalcular Totales Generales
+            let granTotalVenta = 0;
+            let granTotalGanancia = 0;
+            
+            const inputs = document.querySelectorAll('.input-cant-lista');
+            inputs.forEach(inp => {
+                const q = parseFloat(inp.value) || 0;
+                if(q > 0) {
+                    const p = parseFloat(inp.getAttribute('data-precio'));
+                    const c = parseFloat(inp.getAttribute('data-costo')) || 0;
+                    granTotalVenta += (q * p);
+                    granTotalGanancia += (q * (p - c));
+                }
+            });
+
+            document.getElementById('totalLista').innerText = granTotalVenta.toFixed(2);
+            document.getElementById('gananciaLista').innerText = granTotalGanancia.toFixed(2);
+        }
+
+        function limpiarCantidades() {
+            if(confirm("¿Borrar cantidades?")) {
+                document.querySelectorAll('.input-cant-lista').forEach(inp => inp.value = "");
+                document.querySelectorAll('[id^="sub-"]').forEach(s => s.innerText = "0.00");
+                document.getElementById('totalLista').innerText = "0.00";
+                document.getElementById('gananciaLista').innerText = "0.00";
+            }
+        }
+
+        // --- LOGICA ADMIN/BUSQUEDA ---
+        function guardarProducto() {
+            const nombre = document.getElementById('nombreProducto').value.trim().toLowerCase();
+            const precio = parseFloat(document.getElementById('precioProducto').value);
+            const costo = parseFloat(document.getElementById('costoProducto').value);
+
+            if (!nombre || isNaN(precio)) {
+                alert("⚠️ Falta Nombre o Precio.");
+                return;
+            }
+
+            baseDeDatos[nombre] = { precio: precio, costo: isNaN(costo) ? 0 : costo };
+            localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
+            alert("✅ Guardado");
+            volverAtras();
+        }
+
+        function buscarProducto() {
+            const busqueda = document.getElementById('busqueda').value.trim().toLowerCase();
+            if(busqueda) buscarProductoInterno(busqueda);
+        }
+
+        function buscarProductoInterno(nombreKey) {
+            const areaCalculo = document.getElementById('area-calculo');
+            const mensajeError = document.getElementById('mensajeError');
+            
+            areaCalculo.style.display = "none";
+            mensajeError.innerText = "";
+            document.getElementById('cantidad').value = "";
+            document.getElementById('resultadoTotal').innerText = "0.00";
+            document.getElementById('resultadoGanancia').innerText = "0.00";
+
+            if (baseDeDatos.hasOwnProperty(nombreKey)) {
+                let producto = baseDeDatos[nombreKey];
+                if (typeof producto === 'number') producto = { precio: producto, costo: 0 };
+
+                nombreActual = nombreKey;
+                precioActual = producto.precio;
+                costoActual = producto.costo;
+                
+                // Actualizar UI Búsqueda
+                document.getElementById('displayNombre').innerText = nombreKey.toUpperCase();
+                document.getElementById('displayPrecio').innerText = precioActual.toFixed(2);
+                document.getElementById('displayCosto').innerText = costoActual.toFixed(2);
+                areaCalculo.style.display = "block";
+                document.getElementById('cantidad').focus();
+            } else {
+                mensajeError.innerText = "❌ No encontrado.";
+            }
+        }
+
+        function calcularTotal() {
+            const cant = parseFloat(document.getElementById('cantidad').value) || 0;
+            document.getElementById('resultadoTotal').innerText = (cant * precioActual).toFixed(2);
+            document.getElementById('resultadoGanancia').innerText = ((cant * precioActual) - (cant * costoActual)).toFixed(2);
+        }
+
+        function cargarDatosParaEditar() {
+            document.getElementById('nombreProducto').value = nombreActual;
+            document.getElementById('precioProducto').value = precioActual;
+            document.getElementById('costoProducto').value = costoActual;
+            irAAdministrar(false);
+        }
+
+        function handleEnter(e) {
+            if(e.key === 'Enter') buscarProducto();
+        }
+
+        function resetearFabrica() {
+            if(confirm("⚠️ ESTO BORRARÁ TODOS TUS PRODUCTOS. ¿Estás seguro?")) {
+                localStorage.removeItem('misProductos');
+                baseDeDatos = {};
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
