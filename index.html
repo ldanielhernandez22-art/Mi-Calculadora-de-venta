@@ -39,7 +39,7 @@
         .btn-green { background-color: #28a745; color: white; }
         .btn-blue { background-color: #007bff; color: white; }
         .btn-red { background-color: #dc3545; color: white; }
-        .btn-purple { background-color: #6f42c1; color: white; }
+        .btn-yellow { background-color: #ffc107; color: #333; }
         .btn-outline { background-color: transparent; border: 2px solid #6c757d; color: #6c757d; margin-bottom: 10px; }
 
         .info-producto { background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
@@ -47,10 +47,15 @@
         .total-grande { font-size: 1.6em; font-weight: bold; color: #28a745; }
         
         .stock-badge { background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9rem; font-weight: bold; }
-        .alerta-stock { background-color: #ffdddd; border-left: 6px solid #f44336; color: #d8000c; padding: 10px; margin-bottom: 15px; display: none; font-weight: bold; }
+        .alerta-stock {
+            background-color: #ffdddd; border-left: 6px solid #f44336;
+            color: #d8000c; padding: 10px; margin-bottom: 15px;
+            display: none; font-weight: bold;
+        }
 
         .fila-critica { background-color: #fff0f0; }
         .fila-critica .nombre-prod { color: #d8000c; }
+        
         .hidden-view { display: none; }
 
         .tabla-lista { width: 100%; border-collapse: collapse; }
@@ -68,28 +73,36 @@
             display: none; flex-direction: column; z-index: 900;
         }
 
-        /* --- ESTILOS NUEVOS PARA GRÁFICOS --- */
-        .grafico-contenedor { margin-top: 20px; }
-        .barra-item { margin-bottom: 15px; }
-        .barra-info { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; }
-        .barra-fondo { background-color: #e9ecef; border-radius: 10px; height: 20px; width: 100%; overflow: hidden; }
-        .barra-progreso { height: 100%; background-color: #007bff; border-radius: 10px; text-align: right; white-space: nowrap; transition: width 1s ease-in-out; }
-        .barra-texto { color: white; font-size: 0.75rem; padding-right: 8px; line-height: 20px; font-weight: bold; }
-        .top-1 .barra-progreso { background-color: #28a745; } /* El más vendido en verde */
-        .top-2 .barra-progreso { background-color: #17a2b8; }
-        .top-3 .barra-progreso { background-color: #ffc107; }
+        /* --- ESTILOS DE GRÁFICAS --- */
+        .grafica-contenedor { margin-top: 10px; }
+        .barra-row { margin-bottom: 12px; }
+        .barra-info { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 3px; }
+        .barra-track { background-color: #e9ecef; height: 12px; border-radius: 6px; overflow: hidden; width: 100%; }
+        .barra-fill { height: 100%; background-color: #007bff; width: 0%; transition: width 1s ease-in-out; }
+        .top-1 .barra-fill { background-color: #28a745; } /* El mejor vendido en verde */
+
+        /* Modal Edición */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
 
     <div class="app-bar">
-        <h1 class="app-title" id="tituloApp">Calculadora POS</h1>
+        <h1 class="app-title" id="tituloApp">Calculadora</h1>
         <button class="menu-btn" onclick="toggleMenu()">⋮</button>
         <div id="dropdownMenu" class="dropdown-menu">
             <div class="dropdown-item" onclick="irABusqueda()">🔍 Venta Rápida</div>
-            <div class="dropdown-item" onclick="irAListaCompleta()">📋 Inventario</div>
+            <div class="dropdown-item" onclick="irAListaCompleta()">📋 Inventario (Editar)</div>
             <div class="dropdown-item" onclick="irAHistorial()">💰 Historial de Ventas</div>
-            <div class="dropdown-item" onclick="irAEstadisticas()">📊 Estadísticas (Top)</div>
+            <div class="dropdown-item" onclick="irAReportes()">📊 Reportes de Ventas</div>
             <div class="dropdown-item" onclick="irAAdministrar(true)">➕ Nuevo Producto</div>
             <hr style="margin: 0;">
             <div class="dropdown-item" onclick="exportarDatos()">📥 Guardar Backup</div>
@@ -100,11 +113,30 @@
 
     <input type="file" id="inputBackup" style="display: none;" onchange="procesarBackup(this)" accept=".json">
 
+    <div id="modalEdicion" class="modal-overlay">
+        <div class="modal-content">
+            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #eee;">✏️ Editar Producto</div>
+            <p id="editNombreDisplay" style="font-weight:bold; color:#007bff; font-size:1.1rem; text-align:center;"></p>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1"><label>Precio Venta:</label><input type="number" id="editPrecio" step="0.01"></div>
+                <div style="flex:1"><label>Costo:</label><input type="number" id="editCosto" step="0.01"></div>
+            </div>
+            <label>Stock Actual (Unidades):</label>
+            <input type="number" id="editStock">
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="action-btn btn-green" onclick="guardarEdicion()">💾 Guardar</button>
+                <button class="action-btn btn-outline" onclick="cerrarEdicion()">Cancelar</button>
+            </div>
+            <hr>
+            <button class="action-btn btn-red" onclick="eliminarProductoDesdeEdit()" style="margin-top:0; font-size:0.9rem;">🗑️ Eliminar este producto</button>
+        </div>
+    </div>
+
     <div class="main-container">
 
         <div id="vista-admin" class="card hidden-view">
              <button class="action-btn btn-outline" onclick="volverAtras()">← Volver</button>
-            <div class="card-header">💾 Datos del Producto</div>
+            <div class="card-header">🆕 Crear Nuevo Producto</div>
             <label>Nombre:</label>
             <input type="text" id="nombreProducto">
             <div style="display:flex; gap:10px">
@@ -113,7 +145,7 @@
             </div>
             <label>Stock Inicial:</label>
             <input type="number" id="stockProducto">
-            <button class="action-btn btn-green" onclick="guardarProducto()">Guardar</button>
+            <button class="action-btn btn-green" onclick="guardarProducto()">Crear Producto</button>
         </div>
 
         <div id="vista-busqueda" class="card">
@@ -165,24 +197,15 @@
                 <div style="font-size:1.2rem; font-weight:bold; text-align:right; color:#28a745">
                     Total Hoy: $<span id="totalVentasDia">0.00</span>
                 </div>
-                <div style="font-size:0.9rem; text-align:right; color:#007bff">
-                    Ganancia Hoy: $<span id="totalGananciaDia">0.00</span>
-                </div>
                 <button class="action-btn btn-red" onclick="borrarHistorial()" style="margin-top:20px">🗑️ Limpiar Historial (Cerrar Caja)</button>
             </div>
         </div>
 
-        <div id="vista-estadisticas" class="hidden-view">
+        <div id="vista-reportes" class="hidden-view">
             <div class="card">
-                <div class="card-header">
-                    <span>📊 Productos Más Vendidos</span>
-                </div>
-                <p style="font-size:0.9rem; color:#666;">Ranking basado en el historial actual.</p>
-                
-                <div id="contenedorGraficos" class="grafico-contenedor">
-                    </div>
-                
-                <button class="action-btn btn-outline" onclick="volverAtras()">← Volver</button>
+                <div class="card-header">📊 Productos Más Vendidos (Top)</div>
+                <p style="color:#666; font-size:0.9rem;">Basado en el historial actual de la caja.</p>
+                <div id="contenedorGraficas" class="grafica-contenedor"></div>
             </div>
         </div>
 
@@ -192,17 +215,17 @@
         let baseDeDatos = JSON.parse(localStorage.getItem('misProductos')) || {};
         let historialVentas = JSON.parse(localStorage.getItem('historialVentas')) || [];
         let nombreActual = "";
+        let productoEnEdicion = "";
 
         function toggleMenu() { document.getElementById('dropdownMenu').classList.toggle('show'); }
         window.onclick = e => { if (!e.target.matches('.menu-btn')) document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove('show')); }
 
         function ocultarVistas() {
-            ['vista-admin', 'vista-busqueda', 'vista-lista', 'vista-historial', 'vista-estadisticas'].forEach(id => document.getElementById(id).classList.add('hidden-view'));
+            ['vista-admin', 'vista-busqueda', 'vista-lista', 'vista-historial', 'vista-reportes'].forEach(id => document.getElementById(id).classList.add('hidden-view'));
             document.getElementById('barraLista').style.display = 'none';
         }
 
         function irABusqueda() { ocultarVistas(); document.getElementById('vista-busqueda').classList.remove('hidden-view'); document.getElementById('tituloApp').innerText = "Venta"; }
-        
         function irAListaCompleta() { 
             ocultarVistas(); 
             document.getElementById('vista-lista').classList.remove('hidden-view'); 
@@ -210,37 +233,35 @@
             document.getElementById('tituloApp').innerText = "Inventario";
             renderizarTablaLista(); 
         }
-        
         function irAHistorial() { 
             ocultarVistas(); 
             document.getElementById('vista-historial').classList.remove('hidden-view'); 
             document.getElementById('tituloApp').innerText = "Caja Diaria";
             renderizarHistorial(); 
         }
-
-        // --- NUEVA FUNCIÓN PARA IR A ESTADÍSTICAS ---
-        function irAEstadisticas() {
+        function irAReportes() {
             ocultarVistas();
-            document.getElementById('vista-estadisticas').classList.remove('hidden-view');
-            document.getElementById('tituloApp').innerText = "Estadísticas";
-            renderizarGrafico();
+            document.getElementById('vista-reportes').classList.remove('hidden-view');
+            document.getElementById('tituloApp').innerText = "Reportes";
+            generarGrafica();
         }
-
         function irAAdministrar(limpiar) {
             ocultarVistas();
             if(limpiar) ['nombreProducto','precioProducto','costoProducto','stockProducto'].forEach(id => document.getElementById(id).value = "");
             document.getElementById('vista-admin').classList.remove('hidden-view');
         }
 
+        // --- FUNCIONES PRINCIPALES ---
         function guardarProducto() {
             const n = document.getElementById('nombreProducto').value.trim().toLowerCase();
             const p = parseFloat(document.getElementById('precioProducto').value);
             const c = parseFloat(document.getElementById('costoProducto').value) || 0;
             const s = parseInt(document.getElementById('stockProducto').value) || 0;
             if(!n || isNaN(p)) return alert("Datos inválidos");
+            if(baseDeDatos[n]) return alert("¡Ya existe!");
             baseDeDatos[n] = { precio: p, costo: c, stock: s };
             localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
-            alert("Guardado");
+            alert("Creado");
             irABusqueda();
         }
 
@@ -248,23 +269,20 @@
             const b = document.getElementById('busqueda').value.trim().toLowerCase();
             const area = document.getElementById('area-calculo');
             const aviso = document.getElementById('avisoStock');
-            
             if (baseDeDatos[b]) {
                 nombreActual = b;
                 const p = baseDeDatos[b];
-                
                 document.getElementById('displayNombre').innerText = b.toUpperCase();
                 document.getElementById('displayPrecio').innerText = p.precio.toFixed(2);
                 document.getElementById('displayStock').innerText = "Stock: " + p.stock;
                 
                 if (p.stock <= 3) {
-                    aviso.style.display = "block"; 
-                    document.getElementById('displayStock').style.backgroundColor = "#dc3545"; 
+                    aviso.style.display = "block";
+                    document.getElementById('displayStock').style.backgroundColor = "#dc3545";
                 } else {
-                    aviso.style.display = "none"; 
-                    document.getElementById('displayStock').style.backgroundColor = "#6c757d"; 
+                    aviso.style.display = "none";
+                    document.getElementById('displayStock').style.backgroundColor = "#6c757d";
                 }
-
                 area.style.display = "block";
                 document.getElementById('cantidad').value = 1;
                 calcularTotal();
@@ -283,9 +301,7 @@
             }
             const totalVenta = cant * p.precio;
             const ganancia = cant * (p.precio - p.costo);
-            
             baseDeDatos[nombre].stock -= cant;
-            
             const venta = {
                 fecha: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 producto: nombre,
@@ -310,37 +326,112 @@
             }
         }
 
+        // --- LÓGICA DE REPORTES (GRÁFICAS) ---
+        function generarGrafica() {
+            const contenedor = document.getElementById('contenedorGraficas');
+            contenedor.innerHTML = "";
+            
+            if(historialVentas.length === 0) {
+                contenedor.innerHTML = "<p style='text-align:center'>No hay ventas registradas hoy.</p>";
+                return;
+            }
+
+            // 1. Agrupar ventas por producto
+            let conteo = {};
+            historialVentas.forEach(v => {
+                if(!conteo[v.producto]) conteo[v.producto] = 0;
+                conteo[v.producto] += v.cantidad;
+            });
+
+            // 2. Convertir a array y ordenar (Mayor a Menor)
+            let datosOrdenados = Object.keys(conteo).map(key => {
+                return { nombre: key, cantidad: conteo[key] };
+            }).sort((a, b) => b.cantidad - a.cantidad);
+
+            // 3. Obtener el valor máximo para calcular porcentajes (la barra más larga)
+            let maxVal = datosOrdenados[0].cantidad;
+
+            // 4. Dibujar las barras
+            datosOrdenados.forEach((d, index) => {
+                const porcentaje = (d.cantidad / maxVal) * 100;
+                const claseExtra = index === 0 ? "top-1" : ""; // Clase especial para el #1
+                
+                const html = `
+                <div class="barra-row ${claseExtra}">
+                    <div class="barra-info">
+                        <b>${d.nombre.toUpperCase()}</b>
+                        <span>${d.cantidad} un.</span>
+                    </div>
+                    <div class="barra-track">
+                        <div class="barra-fill" style="width: ${porcentaje}%"></div>
+                    </div>
+                </div>`;
+                contenedor.innerHTML += html;
+            });
+        }
+
+        // --- RESTO DE FUNCIONES (INVENTARIO, BACKUP, EDICION) ---
         function renderizarTablaLista() {
             const tbody = document.getElementById('cuerpoTablaLista');
             tbody.innerHTML = "";
-            Object.keys(baseDeDatos).sort().forEach((n, i) => {
+            Object.keys(baseDeDatos).sort().forEach((n) => {
                 const p = baseDeDatos[n];
                 const esCritico = p.stock <= 3;
-                const claseFila = esCritico ? "fila-critica" : ""; 
+                const claseFila = esCritico ? "fila-critica" : "";
                 const iconoAlerta = esCritico ? "⚠️ " : "";
-
                 const fila = document.createElement('tr');
                 fila.className = claseFila;
                 fila.innerHTML = `
-                    <td>
-                        <span class="nombre-prod">${iconoAlerta}${n.toUpperCase()}</span><br>
-                        <small>Stock: ${p.stock}</small>
-                    </td>
-                    <td><input type="number" class="qty-list" style="width:50px" oninput="actualizarTotalesLista()" data-n="${n}"></td>
-                    <td style="text-align:right">$<span class="sub-list">0.00</span></td>
+                    <td><span class="nombre-prod">${iconoAlerta}${n.toUpperCase()}</span><br><small>Stock: ${p.stock} | $${p.precio}</small></td>
+                    <td><button class="btn-edit" onclick="abrirEdicion('${n}')">✏️</button></td>
+                    <td><input type="number" class="qty-list" style="width:50px" placeholder="Cant" oninput="actualizarTotalesLista()" data-n="${n}"></td>
                 `;
                 tbody.appendChild(fila);
             });
+        }
+        
+        function abrirEdicion(nombre) {
+            productoEnEdicion = nombre;
+            const p = baseDeDatos[nombre];
+            document.getElementById('editNombreDisplay').innerText = nombre.toUpperCase();
+            document.getElementById('editPrecio').value = p.precio;
+            document.getElementById('editCosto').value = p.costo;
+            document.getElementById('editStock').value = p.stock;
+            document.getElementById('modalEdicion').style.display = "flex";
+        }
+        function cerrarEdicion() { document.getElementById('modalEdicion').style.display = "none"; productoEnEdicion = ""; }
+        function guardarEdicion() {
+            const nuevoPrecio = parseFloat(document.getElementById('editPrecio').value);
+            const nuevoCosto = parseFloat(document.getElementById('editCosto').value) || 0;
+            const nuevoStock = parseInt(document.getElementById('editStock').value);
+            if (isNaN(nuevoPrecio) || isNaN(nuevoStock)) return alert("Revisa los números.");
+            baseDeDatos[productoEnEdicion].precio = nuevoPrecio;
+            baseDeDatos[productoEnEdicion].costo = nuevoCosto;
+            baseDeDatos[productoEnEdicion].stock = nuevoStock;
+            localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
+            alert("Actualizado ✅");
+            cerrarEdicion();
+            renderizarTablaLista();
+        }
+        function eliminarProductoDesdeEdit() {
+            if(confirm("¿Estás seguro de ELIMINAR " + productoEnEdicion.toUpperCase() + "?")) {
+                delete baseDeDatos[productoEnEdicion];
+                localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
+                cerrarEdicion();
+                renderizarTablaLista();
+            }
         }
 
         function actualizarTotalesLista() {
             let t = 0, g = 0;
             document.querySelectorAll('.qty-list').forEach((inp, i) => {
                 const cant = parseFloat(inp.value) || 0;
-                const p = baseDeDatos[inp.getAttribute('data-n')];
-                const sub = cant * p.precio;
-                document.querySelectorAll('.sub-list')[i].innerText = sub.toFixed(2);
-                t += sub; g += (cant * (p.precio - p.costo));
+                if(cant > 0) {
+                    const n = inp.getAttribute('data-n');
+                    const p = baseDeDatos[n];
+                    t += cant * p.precio; 
+                    g += (cant * (p.precio - p.costo));
+                }
             });
             document.getElementById('totalLista').innerText = "$" + t.toFixed(2);
             document.getElementById('gananciaLista').innerText = "$" + g.toFixed(2);
@@ -350,97 +441,35 @@
             let procesado = false;
             document.querySelectorAll('.qty-list').forEach(inp => {
                 const cant = parseInt(inp.value) || 0;
-                if(cant > 0) {
-                    registrarVenta(inp.getAttribute('data-n'), cant);
-                    procesado = true;
-                }
+                if(cant > 0) { registrarVenta(inp.getAttribute('data-n'), cant); procesado = true; }
             });
-            if(procesado) {
-                alert("Ventas registradas");
-                irAListaCompleta();
-            }
+            if(procesado) { alert("Ventas registradas"); irAListaCompleta(); }
         }
 
         function renderizarHistorial() {
             const contenedor = document.getElementById('listaHistorial');
             const totalDia = document.getElementById('totalVentasDia');
-            const ganDia = document.getElementById('totalGananciaDia');
             contenedor.innerHTML = "";
-            let t = 0, g = 0;
-
+            let t = 0;
             historialVentas.forEach(v => {
                 const div = document.createElement('div');
                 div.className = "item-historial";
                 div.innerHTML = `<span class="hist-fecha">${v.fecha}</span> <b>${v.producto.toUpperCase()}</b> (x${v.cantidad}) <span class="hist-monto">$${v.monto.toFixed(2)}</span>`;
                 contenedor.appendChild(div);
-                t += v.monto; g += v.ganancia;
+                t += v.monto;
             });
             totalDia.innerText = t.toFixed(2);
-            ganDia.innerText = g.toFixed(2);
-        }
-
-        // --- LÓGICA DE GRÁFICOS (NUEVO) ---
-        function renderizarGrafico() {
-            const contenedor = document.getElementById('contenedorGraficos');
-            contenedor.innerHTML = "";
-
-            if (historialVentas.length === 0) {
-                contenedor.innerHTML = "<p style='text-align:center'>No hay ventas registradas aún.</p>";
-                return;
-            }
-
-    // 1. Agrupar ventas por producto
-            let conteo = {};
-            historialVentas.forEach(v => {
-                conteo[v.producto] = (conteo[v.producto] || 0) + v.cantidad;
-            });
-
-            // 2. Convertir a array y ordenar de mayor a menor
-            let ordenados = Object.entries(conteo).sort((a,b) => b[1] - a[1]);
-
-            // 3. Obtener el valor máximo para calcular porcentaje (regla de tres)
-            let maxVentas = ordenados[0][1];
-
-            // 4. Generar HTML
-            ordenados.forEach((item, index) => {
-                const nombre = item[0];
-                const cantidad = item[1];
-                const porcentaje = (cantidad / maxVentas) * 100;
-                
-                // Colores para el Top 3
-                let claseTop = "";
-                if(index === 0) claseTop = "top-1";
-                else if(index === 1) claseTop = "top-2";
-                else if(index === 2) claseTop = "top-3";
-
-                const barraHTML = `
-                <div class="barra-item ${claseTop}">
-                    <div class="barra-info">
-                        <span style="font-weight:bold">${nombre.toUpperCase()}</span>
-                        <span>${cantidad} un.</span>
-                    </div>
-                    <div class="barra-fondo">
-                        <div class="barra-progreso" style="width: ${porcentaje}%">
-                            <span class="barra-texto">${cantidad}</span>
-                        </div>
-                    </div>
-                </div>`;
-                contenedor.innerHTML += barraHTML;
-            });
         }
 
         function borrarHistorial() { if(confirm("¿Cerrar caja y limpiar ventas?")) { historialVentas = []; localStorage.setItem('historialVentas', JSON.stringify([])); renderizarHistorial(); } }
         function handleEnter(e) { if(e.key === 'Enter') buscarProducto(); }
         function volverAtras() { irABusqueda(); }
         function resetearFabrica() { if(confirm("⚠️ BORRAR TODO?")) { localStorage.clear(); location.reload(); } }
-        
         function exportarDatos() { 
             const blob = new Blob([JSON.stringify(baseDeDatos)], {type: 'application/json'});
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup_inventario.json'; a.click();
         }
-
         function triggerImportar() { document.getElementById('inputBackup').click(); }
-
         function procesarBackup(input) {
             const archivo = input.files[0];
             if (!archivo) return;
@@ -449,11 +478,11 @@
                 try {
                     const datosRecuperados = JSON.parse(e.target.result);
                     if(typeof datosRecuperados === 'object') {
-                        if(confirm("⚠️ Esto reemplazará tus productos actuales con los del backup. ¿Continuar?")) {
+                        if(confirm("⚠️ Se reemplazarán tus productos actuales. ¿Continuar?")) {
                             baseDeDatos = datosRecuperados;
                             localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
-                            alert("✅ Backup restaurado con éxito.");
-                            location.reload(); 
+                            alert("✅ Backup restaurado.");
+                            location.reload();
                         }
                     }
                 } catch (error) { alert("❌ Error en el archivo."); }
@@ -462,4 +491,4 @@
         }
     </script>
 </body>
-</html>       
+</html>
