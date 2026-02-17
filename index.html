@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Punto de Venta Profesional</title>
+    <title>Punto de Venta Pro + Historial</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f5; padding-bottom: 100px; }
         
@@ -39,7 +39,7 @@
         .btn-green { background-color: #28a745; color: white; }
         .btn-blue { background-color: #007bff; color: white; }
         .btn-red { background-color: #dc3545; color: white; }
-        .btn-yellow { background-color: #ffc107; color: #333; }
+        .btn-purple { background-color: #6f42c1; color: white; }
         .btn-outline { background-color: transparent; border: 2px solid #6c757d; color: #6c757d; margin-bottom: 10px; }
 
         .info-producto { background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
@@ -79,7 +79,15 @@
         .barra-info { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 3px; }
         .barra-track { background-color: #e9ecef; height: 12px; border-radius: 6px; overflow: hidden; width: 100%; }
         .barra-fill { height: 100%; background-color: #007bff; width: 0%; transition: width 1s ease-in-out; }
-        .top-1 .barra-fill { background-color: #28a745; } /* El mejor vendido en verde */
+        .top-1 .barra-fill { background-color: #28a745; } 
+
+        /* TABLA DE DÍAS ANTERIORES */
+        .tabla-dias { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        .tabla-dias th { text-align: left; background: #f8f9fa; padding: 8px; border-bottom: 2px solid #ddd; }
+        .tabla-dias td { padding: 8px; border-bottom: 1px solid #eee; }
+        .td-fecha { color: #555; font-weight: bold; }
+        .td-venta { color: #28a745; font-weight: bold; text-align: right; }
+        .td-ganancia { color: #007bff; font-weight: bold; text-align: right; }
 
         /* Modal Edición */
         .modal-overlay {
@@ -101,7 +109,7 @@
         <div id="dropdownMenu" class="dropdown-menu">
             <div class="dropdown-item" onclick="irABusqueda()">🔍 Venta Rápida</div>
             <div class="dropdown-item" onclick="irAListaCompleta()">📋 Inventario (Editar)</div>
-            <div class="dropdown-item" onclick="irAHistorial()">💰 Historial de Ventas</div>
+            <div class="dropdown-item" onclick="irAHistorial()">💰 Historial y Cierre</div>
             <div class="dropdown-item" onclick="irAReportes()">📊 Reportes de Ventas</div>
             <div class="dropdown-item" onclick="irAAdministrar(true)">➕ Nuevo Producto</div>
             <hr style="margin: 0;">
@@ -191,20 +199,44 @@
 
         <div id="vista-historial" class="hidden-view">
             <div class="card">
-                <div class="card-header">💰 Ventas del Día</div>
+                <div class="card-header">💰 Caja del Día (Hoy)</div>
                 <div id="listaHistorial"></div>
                 <hr>
-                <div style="font-size:1.2rem; font-weight:bold; text-align:right; color:#28a745">
-                    Total Hoy: $<span id="totalVentasDia">0.00</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="color:#666">Venta Total:</span>
+                    <span style="font-size:1.2rem; font-weight:bold; color:#28a745">$<span id="totalVentasDia">0.00</span></span>
                 </div>
-                <button class="action-btn btn-red" onclick="borrarHistorial()" style="margin-top:20px">🗑️ Limpiar Historial (Cerrar Caja)</button>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color:#666">Ganancia Neta:</span>
+                    <span style="font-size:1.1rem; font-weight:bold; color:#007bff">$<span id="totalGananciaDia">0.00</span></span>
+                </div>
+                
+                <button class="action-btn btn-purple" onclick="cerrarCajaDelDia()" style="margin-top:20px">🔐 Cerrar Caja y Guardar Día</button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">📅 Registros Anteriores</div>
+                <div id="contenedorDiasPasados">
+                    <table class="tabla-dias">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th style="text-align:right">Venta</th>
+                                <th style="text-align:right">Ganancia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDiasBody">
+                            </tbody>
+                    </table>
+                </div>
+                <button class="action-btn btn-outline" onclick="borrarRegistroDias()" style="margin-top:15px; font-size: 0.8rem">🗑️ Borrar Historial Antiguo</button>
             </div>
         </div>
 
         <div id="vista-reportes" class="hidden-view">
             <div class="card">
-                <div class="card-header">📊 Productos Más Vendidos (Top)</div>
-                <p style="color:#666; font-size:0.9rem;">Basado en el historial actual de la caja.</p>
+                <div class="card-header">📊 Productos Más Vendidos (Hoy)</div>
+                <p style="color:#666; font-size:0.9rem;">Basado en el historial de la caja abierta actual.</p>
                 <div id="contenedorGraficas" class="grafica-contenedor"></div>
             </div>
         </div>
@@ -214,6 +246,9 @@
     <script>
         let baseDeDatos = JSON.parse(localStorage.getItem('misProductos')) || {};
         let historialVentas = JSON.parse(localStorage.getItem('historialVentas')) || [];
+        // Nueva variable para almacenar los cierres de caja
+        let registroDias = JSON.parse(localStorage.getItem('registroDias')) || [];
+        
         let nombreActual = "";
         let productoEnEdicion = "";
 
@@ -236,8 +271,9 @@
         function irAHistorial() { 
             ocultarVistas(); 
             document.getElementById('vista-historial').classList.remove('hidden-view'); 
-            document.getElementById('tituloApp').innerText = "Caja Diaria";
+            document.getElementById('tituloApp').innerText = "Caja y Registros";
             renderizarHistorial(); 
+            renderizarDiasAnteriores(); // Nueva función
         }
         function irAReportes() {
             ocultarVistas();
@@ -300,8 +336,11 @@
                 if(!confirm(`⚠️ Stock insuficiente (${p.stock}). ¿Vender igual?`)) return false;
             }
             const totalVenta = cant * p.precio;
+            // Calcular ganancia: (PrecioVenta - Costo) * Cantidad
             const ganancia = cant * (p.precio - p.costo);
+            
             baseDeDatos[nombre].stock -= cant;
+            
             const venta = {
                 fecha: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 producto: nombre,
@@ -336,25 +375,21 @@
                 return;
             }
 
-            // 1. Agrupar ventas por producto
             let conteo = {};
             historialVentas.forEach(v => {
                 if(!conteo[v.producto]) conteo[v.producto] = 0;
                 conteo[v.producto] += v.cantidad;
             });
 
-            // 2. Convertir a array y ordenar (Mayor a Menor)
             let datosOrdenados = Object.keys(conteo).map(key => {
                 return { nombre: key, cantidad: conteo[key] };
             }).sort((a, b) => b.cantidad - a.cantidad);
 
-            // 3. Obtener el valor máximo para calcular porcentajes (la barra más larga)
             let maxVal = datosOrdenados[0].cantidad;
 
-            // 4. Dibujar las barras
             datosOrdenados.forEach((d, index) => {
                 const porcentaje = (d.cantidad / maxVal) * 100;
-                const claseExtra = index === 0 ? "top-1" : ""; // Clase especial para el #1
+                const claseExtra = index === 0 ? "top-1" : "";
                 
                 const html = `
                 <div class="barra-row ${claseExtra}">
@@ -449,25 +484,100 @@
         function renderizarHistorial() {
             const contenedor = document.getElementById('listaHistorial');
             const totalDia = document.getElementById('totalVentasDia');
+            const totalGanancia = document.getElementById('totalGananciaDia');
+            
             contenedor.innerHTML = "";
-            let t = 0;
+            let t = 0; // Total venta
+            let g = 0; // Total ganancia
+
             historialVentas.forEach(v => {
                 const div = document.createElement('div');
                 div.className = "item-historial";
                 div.innerHTML = `<span class="hist-fecha">${v.fecha}</span> <b>${v.producto.toUpperCase()}</b> (x${v.cantidad}) <span class="hist-monto">$${v.monto.toFixed(2)}</span>`;
                 contenedor.appendChild(div);
                 t += v.monto;
+                g += (v.ganancia || 0); // Sumar ganancia
             });
+            
             totalDia.innerText = t.toFixed(2);
+            totalGanancia.innerText = g.toFixed(2);
+            
+            // Retornamos valores para usarlos en el cierre de caja
+            return { venta: t, ganancia: g };
         }
 
-        function borrarHistorial() { if(confirm("¿Cerrar caja y limpiar ventas?")) { historialVentas = []; localStorage.setItem('historialVentas', JSON.stringify([])); renderizarHistorial(); } }
+        // --- NUEVA LÓGICA DE CIERRE DE CAJA ---
+        function cerrarCajaDelDia() {
+            if(historialVentas.length === 0) return alert("No hay ventas para cerrar.");
+            
+            const totales = renderizarHistorial(); // Obtener totales actuales
+            
+            if(confirm(`¿Cerrar caja?\nVenta: $${totales.venta.toFixed(2)}\nGanancia: $${totales.ganancia.toFixed(2)}\n\nEsto guardará el registro y limpiará la pantalla actual.`)) {
+                
+                // Crear registro del día
+                const hoy = new Date();
+                const fechaFormato = hoy.toLocaleDateString() + " " + hoy.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                const registro = {
+                    fecha: fechaFormato,
+                    totalVenta: totales.venta,
+                    totalGanancia: totales.ganancia
+                };
+
+                // Guardar en array de días anteriores (al principio)
+                registroDias.unshift(registro);
+                localStorage.setItem('registroDias', JSON.stringify(registroDias));
+
+                // Limpiar historial actual
+                historialVentas = [];
+                localStorage.setItem('historialVentas', JSON.stringify([]));
+                
+                // Actualizar vista
+                renderizarHistorial();
+                renderizarDiasAnteriores();
+                alert("✅ Caja cerrada y guardada.");
+            }
+        }
+
+        function renderizarDiasAnteriores() {
+            const tbody = document.getElementById('tablaDiasBody');
+            tbody.innerHTML = "";
+
+            if(registroDias.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='3' style='text-align:center; color:#888'>No hay registros anteriores.</td></tr>";
+                return;
+            }
+
+            registroDias.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="td-fecha">${r.fecha}</td>
+                    <td class="td-venta">$${r.totalVenta.toFixed(2)}</td>
+                    <td class="td-ganancia">$${r.totalGanancia.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function borrarRegistroDias() {
+            if(confirm("⚠️ ¿Estás seguro de borrar todo el historial de días anteriores?")) {
+                registroDias = [];
+                localStorage.setItem('registroDias', JSON.stringify([]));
+                renderizarDiasAnteriores();
+            }
+        }
+
         function handleEnter(e) { if(e.key === 'Enter') buscarProducto(); }
         function volverAtras() { irABusqueda(); }
         function resetearFabrica() { if(confirm("⚠️ BORRAR TODO?")) { localStorage.clear(); location.reload(); } }
         function exportarDatos() { 
-            const blob = new Blob([JSON.stringify(baseDeDatos)], {type: 'application/json'});
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup_inventario.json'; a.click();
+            // Exportamos productos y registro de días
+            const dataFull = {
+                productos: baseDeDatos,
+                registros: registroDias
+            };
+            const blob = new Blob([JSON.stringify(dataFull)], {type: 'application/json'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'backup_completo.json'; a.click();
         }
         function triggerImportar() { document.getElementById('inputBackup').click(); }
         function procesarBackup(input) {
@@ -476,12 +586,24 @@
             const lector = new FileReader();
             lector.onload = function(e) {
                 try {
-                    const datosRecuperados = JSON.parse(e.target.result);
-                    if(typeof datosRecuperados === 'object') {
-                        if(confirm("⚠️ Se reemplazarán tus productos actuales. ¿Continuar?")) {
-                            baseDeDatos = datosRecuperados;
+                    const datos = JSON.parse(e.target.result);
+                    // Soporte para backup viejo (solo productos) o nuevo (completo)
+                    if(datos.productos) {
+                        // Es formato nuevo
+                        if(confirm("Restaurar productos e historial antiguo?")) {
+                            baseDeDatos = datos.productos;
+                            registroDias = datos.registros || [];
                             localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
-                            alert("✅ Backup restaurado.");
+                            localStorage.setItem('registroDias', JSON.stringify(registroDias));
+                            alert("Restaurado ✅");
+                            location.reload();
+                        }
+                    } else {
+                        // Formato viejo (solo era un objeto de productos)
+                        if(confirm("Formato antiguo detectado. Se reemplazarán productos. ¿Continuar?")) {
+                            baseDeDatos = datos;
+                            localStorage.setItem('misProductos', JSON.stringify(baseDeDatos));
+                            alert("Productos restaurados ✅");
                             location.reload();
                         }
                     }
